@@ -1,4 +1,4 @@
-'use strict';Object.defineProperty(exports,'__esModule',{value:true});var Pagination=require('laravel-vue-pagination');function _interopDefaultLegacy(e){return e&&typeof e==='object'&&'default'in e?e:{'default':e}}var Pagination__default=/*#__PURE__*/_interopDefaultLegacy(Pagination);function _defineProperty(obj, key, value) {
+'use strict';Object.defineProperty(exports,'__esModule',{value:true});function _defineProperty(obj, key, value) {
   if (key in obj) {
     Object.defineProperty(obj, key, {
       value: value,
@@ -67,11 +67,81 @@ function _arrayLikeToArray(arr, len) {
 
 function _nonIterableRest() {
   throw new TypeError("Invalid attempt to destructure non-iterable instance.\nIn order to be iterable, non-array objects must have a [Symbol.iterator]() method.");
-}var script = {
+}//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+var script = {
+  /**
+   * Component name
+   */
   name: 'vue-laravel-table',
-  components: {
-    Pagination: Pagination__default['default']
-  },
+
+  /**
+   * Props
+   */
   props: {
     laravelDataUrl: {
       type: String,
@@ -92,46 +162,98 @@ function _nonIterableRest() {
       default: []
     },
     showActionIcons: {
-      type: Boolean
+      type: Boolean,
+      required: false
     },
     csrfToken: {
       type: String,
       required: false
+    },
+    searchableColumns: {
+      type: Array,
+      required: false,
+      default: []
     }
   },
+
+  /**
+   * Our data
+   */
   data: function data() {
     return {
       laravelData: {},
       tableHeaders: [],
       loading: false,
-      acceptedActions: ['create', 'edit', 'show', 'delete']
+      acceptedActions: ['create', 'edit', 'show', 'delete'],
+      searchQuery: ''
     };
   },
   mounted: function mounted() {
-    this.getResults();
+    this.getResults(this.laravelDataUrl);
   },
   computed: {
+    /**
+     * Table headers are computed, since they will not likey change
+     * ever because they are the keys of the database table that we
+     * get the data from
+     */
     generateTableHeaders: function generateTableHeaders() {
       var headers = [];
 
-      for (var _i = 0, _Object$entries = Object.entries(this.laravelData.data[0]); _i < _Object$entries.length; _i++) {
-        var _Object$entries$_i = _slicedToArray(_Object$entries[_i], 2),
-            k = _Object$entries$_i[0],
-            v = _Object$entries$_i[1];
+      if (this.laravelData.total > 0) {
+        for (var _i = 0, _Object$entries = Object.entries(this.laravelData.data[0]); _i < _Object$entries.length; _i++) {
+          var _Object$entries$_i = _slicedToArray(_Object$entries[_i], 2),
+              k = _Object$entries$_i[0],
+              v = _Object$entries$_i[1];
 
-        this.hideColumns.includes(k) && headers.push(this.formatHeader(k));
+          !this.hideColumns.includes(k) && headers.push(this.formatHeader(k));
+        }
+
+        this.showActions.length && headers.push(this.formatHeader('actions'));
+        return headers;
       }
-
-      return headers;
+    }
+  },
+  watch: {
+    /**
+     * searchQuery are beein watched for changes
+     * so everytime the search query changes, the "search" method
+     * is run..
+     * TODO: Add throttling
+     */
+    searchQuery: function searchQuery(v) {
+      this.search(v);
     }
   },
   methods: {
-    getResults: function getResults() {
+    /**
+     * Simple search query
+     */
+    search: function search(query) {
+      this.getResults(this.laravelData.links[1].url, query);
+    },
+
+    /**
+     * Simple pagination based on what link got clicked in the pagination
+     * elements.. Search query are also beeing added to the URL if there
+     * has been a search
+     */
+    paginate: function paginate(event) {
+      event.preventDefault();
+      this.getResults(event.target.getAttribute('data-href'), this.searchQuery);
+    },
+    getResults: function getResults(url) {
       var _this = this;
 
-      var page = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : 1;
+      var query = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : false;
       this.loading = true;
-      axios.get(this.laravelDataUrl + '?page=' + page).then(function (response) {
+      var dataUrl = url;
+
+      if (query !== false && query.length) {
+        dataUrl += '&q=' + encodeURI(query) + '&qC=' + encodeURI(this.searchableColumns);
+      }
+
+      axios.get(dataUrl).then(function (response) {
         _this.laravelData = response.data;
         _this.tableHeaders = _this.generateTableHeaders;
         _this.loading = false;
@@ -139,9 +261,22 @@ function _nonIterableRest() {
         throw new Error(error);
       });
     },
+
+    /**
+     * Simple header formating
+     * Capitalizing and removing underscores that may
+     * come from the laravel data object (database column names)
+     */
     formatHeader: function formatHeader(str) {
       return (str[0].toUpperCase() + str.slice(1)).replace(/_/g, ' ');
     },
+
+    /**
+     * This generates the row actions, 
+     * only show, edit and delete actions
+     * and not the create action because that is not
+     * placed in a table row, rather at the top of the table
+     */
     generateRowActions: function generateRowActions(id) {
       var generatedActions = [];
 
@@ -155,9 +290,20 @@ function _nonIterableRest() {
 
       return generatedActions;
     },
+
+    /**
+     * Simply generates a create button based on
+     * the data resource passed with props
+     */
     generateCreateButton: function generateCreateButton() {
       return this.generateActionHtml('create');
     },
+
+    /**
+     * Generates actions based on what kind of type it is
+     * For now, one can generate links for create, edit, and show model
+     * and generate a create model button/link
+     */
     generateActionHtml: function generateActionHtml(type, csrf) {
       var id = arguments.length > 2 && arguments[2] !== undefined ? arguments[2] : false;
       var html = '';
@@ -314,27 +460,24 @@ var __vue_render__ = function __vue_render__() {
 
   return _c('div', {
     staticClass: "table-wrapper"
-  }, [_vm._ssrNode("<div class=\"table-actions\">" + (_vm.showActions.includes('create') ? "<span>" + _vm._s(this.generateCreateButton()) + "</span>" : "<!---->") + "</div> <table class=\"table table-bordered\"><thead class=\"font-weight-bold\"><tr>" + _vm._ssrList(_vm.tableHeaders, function (header) {
+  }, [_vm._ssrNode("<div class=\"table-actions\">" + (_vm.showActions.includes('create') ? "<span>" + _vm._s(this.generateCreateButton()) + "</span>" : "<!---->") + " " + (_vm.searchableColumns.length ? "<div class=\"search\"><input id=\"search\" type=\"text\" name=\"q\" placeholder=\"Search...\"" + _vm._ssrAttr("value", _vm.searchQuery) + " class=\"form-control\"></div>" : "<!---->") + "</div> <table class=\"table table-bordered\"><thead class=\"font-weight-bold\"><tr>" + _vm._ssrList(_vm.tableHeaders, function (header) {
     return "<td>" + _vm._ssrEscape(_vm._s(header)) + "</td>";
-  }) + " " + (_vm.showActions.length ? "<td>Actions</td>" : "<!---->") + "</tr></thead> <tbody>" + _vm._ssrList(_vm.laravelData.data, function (r, k) {
-    return "<tr>" + _vm._ssrList(r, function (v, k) {
+  }) + "</tr></thead> <tbody>" + (_vm.laravelData.total == 0 ? "<tr><span class=\"no-results\">No results</span></tr>" : "<!---->") + " " + _vm._ssrList(_vm.laravelData.data, function (r, k) {
+    return _vm.laravelData.total != 0 ? "<tr>" + _vm._ssrList(r, function (v, k) {
       return _vm.hideColumns.includes(k) == false ? "<td>" + _vm._ssrEscape(_vm._s(v)) + "</td>" : "<!---->";
     }) + " " + (_vm.showActions.length ? "<td class=\"row-actions\">" + _vm._ssrList(_vm.generateRowActions(r.id), function (v, k) {
       return _vm._ssrList(v, function (v, k) {
         return "<span class=\"action\">" + _vm._s(v) + "</span>";
       });
-    }) + "</td>" : "<!---->") + "</tr>";
-  }) + "</tbody></table> "), _c('Pagination', {
-    attrs: {
-      "show-disabled": true,
-      "data": _vm.laravelData
-    },
-    on: {
-      "pagination-change-page": _vm.getResults
-    }
-  }), _vm._ssrNode(" <div" + _vm._ssrClass("loading-spinner", {
+    }) + "</td>" : "<!---->") + "</tr>" : "<!---->";
+  }) + "</tbody></table> " + (_vm.laravelData.total != 0 ? "<div id=\"pagination\"><ul class=\"pagination\">" + _vm._ssrList(_vm.laravelData.links, function (link) {
+    return "<li" + _vm._ssrClass("page-item", {
+      disabled: link.url == null,
+      active: link.active
+    }) + "><a href=\"#\"" + _vm._ssrAttr("data-href", link.url) + " class=\"page-link\">" + _vm._s(link.label) + "</a></li>";
+  }) + "</ul></div>" : "<!---->") + " <div" + _vm._ssrClass("loading-spinner", {
     show: _vm.loading
-  }) + "><div class=\"lds-ring\"><div></div> <div></div> <div></div> <div></div></div></div>")], 2);
+  }) + "><div class=\"lds-ring\"><div></div> <div></div> <div></div> <div></div></div></div>")]);
 };
 
 var __vue_staticRenderFns__ = [];
@@ -342,8 +485,8 @@ var __vue_staticRenderFns__ = [];
 
 var __vue_inject_styles__ = function __vue_inject_styles__(inject) {
   if (!inject) return;
-  inject("data-v-482838f8_0", {
-    source: ".pagination{display:inline-flex!important}.table-actions{margin:10px 0}.table-actions span{margin:0 10px}.table-actions span:first-child{margin-left:0}.table-actions span:last-child{margim-right:0}.row-actions .action{margin:0 10px}.row-actions .action:first-child{margin-left:0}.row-actions .action:last-child{margin-right:0}.row-actions .action-form{display:inline-flex}.row-actions .action-form button{padding:0;margin:0}.loading-spinner{display:inline-flex;opacity:0;transition:opacity .1s cubic-bezier(1,1,0,0);position:absolute;margin:12px}.loading-spinner.show{opacity:1}.loading-spinner.show .lds-ring div{animation:lds-ring 1.2s cubic-bezier(.5,0,.5,1) infinite}.loading-spinner .lds-ring{position:relative}.loading-spinner .lds-ring div{box-sizing:border-box;display:block;position:absolute;border:2px solid #007bff;border-radius:50%;border-color:#007bff transparent transparent transparent;width:16px;height:16px}.loading-spinner .lds-ring div:nth-child(1){animation-delay:-.45s}.loading-spinner .lds-ring div:nth-child(2){animation-delay:-.3s}.loading-spinner .lds-ring div:nth-child(3){animation-delay:-.15s}@keyframes lds-ring{0%{transform:rotate(0)}100%{transform:rotate(360deg)}}",
+  inject("data-v-7b1346a3_0", {
+    source: "#pagination{display:inline-flex}.table-actions{margin:10px 0}.table-actions span{display:inline-block;margin:0 10px}.table-actions span:first-child{margin-left:0}.table-actions span:last-child{margim-right:0}.table-actions .search{width:200px;display:inline-block;position:relative;top:3px}.row-actions .action{margin:0 10px}.row-actions .action:first-child{margin-left:0}.row-actions .action:last-child{margin-right:0}.row-actions .action-form{display:inline-flex}.row-actions .action-form button{padding:0;margin:0}.loading-spinner{display:inline-flex;opacity:0;transition:opacity .1s cubic-bezier(1,1,0,0);position:absolute;margin:12px}.loading-spinner.show{opacity:1}.loading-spinner.show .lds-ring div{animation:lds-ring 1.2s cubic-bezier(.5,0,.5,1) infinite}.loading-spinner .lds-ring{position:relative}.loading-spinner .lds-ring div{box-sizing:border-box;display:block;position:absolute;border:2px solid #007bff;border-radius:50%;border-color:#007bff transparent transparent transparent;width:16px;height:16px}.loading-spinner .lds-ring div:nth-child(1){animation-delay:-.45s}.loading-spinner .lds-ring div:nth-child(2){animation-delay:-.3s}.loading-spinner .lds-ring div:nth-child(3){animation-delay:-.15s}@keyframes lds-ring{0%{transform:rotate(0)}100%{transform:rotate(360deg)}}",
     map: undefined,
     media: undefined
   });
@@ -354,7 +497,7 @@ var __vue_inject_styles__ = function __vue_inject_styles__(inject) {
 var __vue_scope_id__ = undefined;
 /* module identifier */
 
-var __vue_module_identifier__ = "data-v-482838f8";
+var __vue_module_identifier__ = "data-v-7b1346a3";
 /* functional template */
 
 var __vue_is_functional_template__ = false;

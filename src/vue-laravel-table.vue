@@ -6,6 +6,11 @@
       <template v-if="showActions.includes('create')">
         <span v-html="this.generateCreateButton()"></span>
       </template>
+      <template v-if="searchableColumns.length">
+        <div class="search">
+          <input v-model="searchQuery" id="search" class="form-control" type="text" name="q" placeholder="Search..." />
+        </div> 
+      </template>
     </div>
       
     <table class="table table-bordered">
@@ -13,12 +18,14 @@
       <thead class="font-weight-bold">
         <tr>
           <td v-for="header in tableHeaders">{{ header }}</td>
-          <td v-if="showActions.length">Actions</td>
         </tr>
       </thead>
 
       <tbody>
-        <tr v-for="(r, k) in laravelData.data">
+        <tr v-if="laravelData.total == 0">
+          <span class="no-results">No results</span>
+        </tr>
+        <tr v-if="laravelData.total != 0" v-for="(r, k) in laravelData.data">
           <td v-for="(v, k) in r" v-if="hideColumns.includes(k) == false">
             <template>{{ v }}</template>
           </td>
@@ -32,7 +39,15 @@
 
     </table>
 
-    <Pagination :show-disabled="true" :data="laravelData" @pagination-change-page="getResults"></Pagination>
+    <div v-if="laravelData.total != 0" id="pagination">
+      <ul class="pagination">
+        <template v-for="link in laravelData.links">
+          <li class="page-item" :class="{ disabled: link.url == null, active: link.active }">
+            <a class="page-link" href="#" :data-href="link.url" v-html="link.label" v-on:click="paginate($event)"></a>
+          </li>
+        </template>
+      </ul>
+    </div>
 
     <div :class="{ show: loading }" class="loading-spinner">
       <div class="lds-ring">
@@ -50,11 +65,16 @@
 
 
 <script>
-import Pagination from 'laravel-vue-pagination';
 export default {
-
+  
+  /**
+   * Component name
+   */
   name: 'vue-laravel-table',
-  components: { Pagination },
+
+  /**
+   * Props
+   */
   props: {
     laravelDataUrl: {
       type: String,
@@ -75,42 +95,100 @@ export default {
       default: []
     },
     showActionIcons: {
-      type: Boolean
+      type: Boolean,
+      required: false
     },
     csrfToken: {
       type: String,
       required: false
+    },
+    searchableColumns: {
+      type: Array,
+      required: false,
+      default: []
     }
   },
 
+  /**
+   * Our data
+   */
   data: function() {
     return {
       laravelData: {},
       tableHeaders: [],
       loading: false,
-      acceptedActions: ['create', 'edit', 'show', 'delete']
+      acceptedActions: ['create', 'edit', 'show', 'delete'],
+      searchQuery: ''
     }
   },
 
   mounted() {
-    this.getResults();
+    this.getResults(this.laravelDataUrl);
   },
 
   computed: {
+
+    /**
+     * Table headers are computed, since they will not likey change
+     * ever because they are the keys of the database table that we
+     * get the data from
+     */
     generateTableHeaders: function() {
       var headers = [];
-      for(const [k, v] of Object.entries(this.laravelData.data[0])) {
-        this.hideColumns.includes(k) && headers.push(this.formatHeader(k));
+      if (this.laravelData.total > 0) {
+        for(const [k, v] of Object.entries(this.laravelData.data[0])) {
+          !this.hideColumns.includes(k) && headers.push(this.formatHeader(k));
+        }
+        this.showActions.length && headers.push(this.formatHeader('actions'));
+        return headers;
       }
-      return headers;
     }
+
+  },
+
+  watch: {
+
+    /**
+     * searchQuery are beein watched for changes
+     * so everytime the search query changes, the "search" method
+     * is run..
+     * TODO: Add throttling
+     */
+    searchQuery: function(v) {
+      this.search(v);
+    }
+
   },
 
   methods: {
 
-    getResults(page = 1) {
+    /**
+     * Simple search query
+     */
+    search(query) {
+      this.getResults(this.laravelData.links[1].url, query);
+    },
+
+    /**
+     * Simple pagination based on what link got clicked in the pagination
+     * elements.. Search query are also beeing added to the URL if there
+     * has been a search
+     */
+    paginate(event) {
+      event.preventDefault();
+      this.getResults(event.target.getAttribute('data-href'), this.searchQuery);
+    },
+
+
+    getResults(url, query = false) {
       this.loading = true;
-      axios.get(this.laravelDataUrl + '?page=' + page)
+
+      var dataUrl = url;
+      if (query !== false && query.length) {
+        dataUrl+= '&q=' + encodeURI(query) + '&qC='+ encodeURI(this.searchableColumns);
+      }
+
+      axios.get(dataUrl)
       .then(response => {
         this.laravelData = response.data;
         this.tableHeaders = this.generateTableHeaders;
@@ -121,10 +199,21 @@ export default {
       });
     },
 
+    /**
+     * Simple header formating
+     * Capitalizing and removing underscores that may
+     * come from the laravel data object (database column names)
+     */
     formatHeader(str) {
       return (str[0].toUpperCase() + str.slice(1)).replace(/_/g, ' ');
     },
 
+    /**
+     * This generates the row actions, 
+     * only show, edit and delete actions
+     * and not the create action because that is not
+     * placed in a table row, rather at the top of the table
+     */
     generateRowActions(id) {
       var generatedActions = [];
 
@@ -137,10 +226,19 @@ export default {
       return generatedActions;
     },
 
+    /**
+     * Simply generates a create button based on
+     * the data resource passed with props
+     */
     generateCreateButton() {
       return this.generateActionHtml('create');
     },
 
+    /**
+     * Generates actions based on what kind of type it is
+     * For now, one can generate links for create, edit, and show model
+     * and generate a create model button/link
+     */ 
     generateActionHtml(type, csrf, id = false) {
 
       var html = '';
@@ -187,14 +285,15 @@ export default {
 
     $spinnerColor:#007bff;
 
-    .pagination {
-        display:inline-flex!important;
+    #pagination {
+      display:inline-flex;
     }
 
     .table-actions {
       margin:10px 0;
 
       span {
+        display:inline-block;
         margin:0 10px;
 
         &:first-child {
@@ -204,6 +303,13 @@ export default {
         &:last-child {
           margim-right:0;
         }
+      }
+
+      .search {
+        width:200px;
+        display:inline-block;
+        position:relative;
+        top:3px;
       }
     }
 

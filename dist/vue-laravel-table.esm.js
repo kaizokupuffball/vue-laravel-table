@@ -1,11 +1,78 @@
-import Pagination from 'laravel-vue-pagination';
-
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
 //
 var script = {
+  /**
+   * Component name
+   */
   name: 'vue-laravel-table',
-  components: {
-    Pagination
-  },
+
+  /**
+   * Props
+   */
   props: {
     laravelDataUrl: {
       type: String,
@@ -26,41 +93,94 @@ var script = {
       default: []
     },
     showActionIcons: {
-      type: Boolean
+      type: Boolean,
+      required: false
     },
     csrfToken: {
       type: String,
       required: false
+    },
+    searchableColumns: {
+      type: Array,
+      required: false,
+      default: []
     }
   },
+
+  /**
+   * Our data
+   */
   data: function () {
     return {
       laravelData: {},
       tableHeaders: [],
       loading: false,
-      acceptedActions: ['create', 'edit', 'show', 'delete']
+      acceptedActions: ['create', 'edit', 'show', 'delete'],
+      searchQuery: ''
     };
   },
 
   mounted() {
-    this.getResults();
+    this.getResults(this.laravelDataUrl);
   },
 
   computed: {
+    /**
+     * Table headers are computed, since they will not likey change
+     * ever because they are the keys of the database table that we
+     * get the data from
+     */
     generateTableHeaders: function () {
       var headers = [];
 
-      for (const [k, v] of Object.entries(this.laravelData.data[0])) {
-        this.hideColumns.includes(k) && headers.push(this.formatHeader(k));
-      }
+      if (this.laravelData.total > 0) {
+        for (const [k, v] of Object.entries(this.laravelData.data[0])) {
+          !this.hideColumns.includes(k) && headers.push(this.formatHeader(k));
+        }
 
-      return headers;
+        this.showActions.length && headers.push(this.formatHeader('actions'));
+        return headers;
+      }
+    }
+  },
+  watch: {
+    /**
+     * searchQuery are beein watched for changes
+     * so everytime the search query changes, the "search" method
+     * is run..
+     * TODO: Add throttling
+     */
+    searchQuery: function (v) {
+      this.search(v);
     }
   },
   methods: {
-    getResults(page = 1) {
+    /**
+     * Simple search query
+     */
+    search(query) {
+      this.getResults(this.laravelData.links[1].url, query);
+    },
+
+    /**
+     * Simple pagination based on what link got clicked in the pagination
+     * elements.. Search query are also beeing added to the URL if there
+     * has been a search
+     */
+    paginate(event) {
+      event.preventDefault();
+      this.getResults(event.target.getAttribute('data-href'), this.searchQuery);
+    },
+
+    getResults(url, query = false) {
       this.loading = true;
-      axios.get(this.laravelDataUrl + '?page=' + page).then(response => {
+      var dataUrl = url;
+
+      if (query !== false && query.length) {
+        dataUrl += '&q=' + encodeURI(query) + '&qC=' + encodeURI(this.searchableColumns);
+      }
+
+      axios.get(dataUrl).then(response => {
         this.laravelData = response.data;
         this.tableHeaders = this.generateTableHeaders;
         this.loading = false;
@@ -69,10 +189,21 @@ var script = {
       });
     },
 
+    /**
+     * Simple header formating
+     * Capitalizing and removing underscores that may
+     * come from the laravel data object (database column names)
+     */
     formatHeader(str) {
       return (str[0].toUpperCase() + str.slice(1)).replace(/_/g, ' ');
     },
 
+    /**
+     * This generates the row actions, 
+     * only show, edit and delete actions
+     * and not the create action because that is not
+     * placed in a table row, rather at the top of the table
+     */
     generateRowActions(id) {
       var generatedActions = [];
 
@@ -85,10 +216,19 @@ var script = {
       return generatedActions;
     },
 
+    /**
+     * Simply generates a create button based on
+     * the data resource passed with props
+     */
     generateCreateButton() {
       return this.generateActionHtml('create');
     },
 
+    /**
+     * Generates actions based on what kind of type it is
+     * For now, one can generate links for create, edit, and show model
+     * and generate a create model button/link
+     */
     generateActionHtml(type, csrf, id = false) {
       var html = '';
       var url = this.laravelDataResource.prefix ? '/' + this.laravelDataResource.prefix + '/' + this.laravelDataResource.name + '/' : '/' + this.laravelDataResource.name + '/';
@@ -268,14 +408,44 @@ var __vue_render__ = function () {
     domProps: {
       "innerHTML": _vm._s(this.generateCreateButton())
     }
-  })] : _vm._e()], 2), _vm._v(" "), _c('table', {
+  })] : _vm._e(), _vm._v(" "), _vm.searchableColumns.length ? [_c('div', {
+    staticClass: "search"
+  }, [_c('input', {
+    directives: [{
+      name: "model",
+      rawName: "v-model",
+      value: _vm.searchQuery,
+      expression: "searchQuery"
+    }],
+    staticClass: "form-control",
+    attrs: {
+      "id": "search",
+      "type": "text",
+      "name": "q",
+      "placeholder": "Search..."
+    },
+    domProps: {
+      "value": _vm.searchQuery
+    },
+    on: {
+      "input": function ($event) {
+        if ($event.target.composing) {
+          return;
+        }
+
+        _vm.searchQuery = $event.target.value;
+      }
+    }
+  })])] : _vm._e()], 2), _vm._v(" "), _c('table', {
     staticClass: "table table-bordered"
   }, [_c('thead', {
     staticClass: "font-weight-bold"
-  }, [_c('tr', [_vm._l(_vm.tableHeaders, function (header) {
+  }, [_c('tr', _vm._l(_vm.tableHeaders, function (header) {
     return _c('td', [_vm._v(_vm._s(header))]);
-  }), _vm._v(" "), _vm.showActions.length ? _c('td', [_vm._v("Actions")]) : _vm._e()], 2)]), _vm._v(" "), _c('tbody', _vm._l(_vm.laravelData.data, function (r, k) {
-    return _c('tr', [_vm._l(r, function (v, k) {
+  }), 0)]), _vm._v(" "), _c('tbody', [_vm.laravelData.total == 0 ? _c('tr', [_c('span', {
+    staticClass: "no-results"
+  }, [_vm._v("No results")])]) : _vm._e(), _vm._v(" "), _vm._l(_vm.laravelData.data, function (r, k) {
+    return _vm.laravelData.total != 0 ? _c('tr', [_vm._l(r, function (v, k) {
       return _vm.hideColumns.includes(k) == false ? _c('td', [[_vm._v(_vm._s(v))]], 2) : _vm._e();
     }), _vm._v(" "), _vm.showActions.length ? _c('td', {
       staticClass: "row-actions"
@@ -288,21 +458,41 @@ var __vue_render__ = function () {
           }
         });
       });
-    })], 2) : _vm._e()], 2);
-  }), 0)]), _vm._v(" "), _c('Pagination', {
+    })], 2) : _vm._e()], 2) : _vm._e();
+  })], 2)]), _vm._v(" "), _vm.laravelData.total != 0 ? _c('div', {
     attrs: {
-      "show-disabled": true,
-      "data": _vm.laravelData
-    },
-    on: {
-      "pagination-change-page": _vm.getResults
+      "id": "pagination"
     }
-  }), _vm._v(" "), _c('div', {
+  }, [_c('ul', {
+    staticClass: "pagination"
+  }, [_vm._l(_vm.laravelData.links, function (link) {
+    return [_c('li', {
+      staticClass: "page-item",
+      class: {
+        disabled: link.url == null,
+        active: link.active
+      }
+    }, [_c('a', {
+      staticClass: "page-link",
+      attrs: {
+        "href": "#",
+        "data-href": link.url
+      },
+      domProps: {
+        "innerHTML": _vm._s(link.label)
+      },
+      on: {
+        "click": function ($event) {
+          return _vm.paginate($event);
+        }
+      }
+    })])];
+  })], 2)]) : _vm._e(), _vm._v(" "), _c('div', {
     staticClass: "loading-spinner",
     class: {
       show: _vm.loading
     }
-  }, [_vm._m(0)])], 1);
+  }, [_vm._m(0)])]);
 };
 
 var __vue_staticRenderFns__ = [function () {
@@ -320,8 +510,8 @@ var __vue_staticRenderFns__ = [function () {
 
 const __vue_inject_styles__ = function (inject) {
   if (!inject) return;
-  inject("data-v-482838f8_0", {
-    source: ".pagination{display:inline-flex!important}.table-actions{margin:10px 0}.table-actions span{margin:0 10px}.table-actions span:first-child{margin-left:0}.table-actions span:last-child{margim-right:0}.row-actions .action{margin:0 10px}.row-actions .action:first-child{margin-left:0}.row-actions .action:last-child{margin-right:0}.row-actions .action-form{display:inline-flex}.row-actions .action-form button{padding:0;margin:0}.loading-spinner{display:inline-flex;opacity:0;transition:opacity .1s cubic-bezier(1,1,0,0);position:absolute;margin:12px}.loading-spinner.show{opacity:1}.loading-spinner.show .lds-ring div{animation:lds-ring 1.2s cubic-bezier(.5,0,.5,1) infinite}.loading-spinner .lds-ring{position:relative}.loading-spinner .lds-ring div{box-sizing:border-box;display:block;position:absolute;border:2px solid #007bff;border-radius:50%;border-color:#007bff transparent transparent transparent;width:16px;height:16px}.loading-spinner .lds-ring div:nth-child(1){animation-delay:-.45s}.loading-spinner .lds-ring div:nth-child(2){animation-delay:-.3s}.loading-spinner .lds-ring div:nth-child(3){animation-delay:-.15s}@keyframes lds-ring{0%{transform:rotate(0)}100%{transform:rotate(360deg)}}",
+  inject("data-v-7b1346a3_0", {
+    source: "#pagination{display:inline-flex}.table-actions{margin:10px 0}.table-actions span{display:inline-block;margin:0 10px}.table-actions span:first-child{margin-left:0}.table-actions span:last-child{margim-right:0}.table-actions .search{width:200px;display:inline-block;position:relative;top:3px}.row-actions .action{margin:0 10px}.row-actions .action:first-child{margin-left:0}.row-actions .action:last-child{margin-right:0}.row-actions .action-form{display:inline-flex}.row-actions .action-form button{padding:0;margin:0}.loading-spinner{display:inline-flex;opacity:0;transition:opacity .1s cubic-bezier(1,1,0,0);position:absolute;margin:12px}.loading-spinner.show{opacity:1}.loading-spinner.show .lds-ring div{animation:lds-ring 1.2s cubic-bezier(.5,0,.5,1) infinite}.loading-spinner .lds-ring{position:relative}.loading-spinner .lds-ring div{box-sizing:border-box;display:block;position:absolute;border:2px solid #007bff;border-radius:50%;border-color:#007bff transparent transparent transparent;width:16px;height:16px}.loading-spinner .lds-ring div:nth-child(1){animation-delay:-.45s}.loading-spinner .lds-ring div:nth-child(2){animation-delay:-.3s}.loading-spinner .lds-ring div:nth-child(3){animation-delay:-.15s}@keyframes lds-ring{0%{transform:rotate(0)}100%{transform:rotate(360deg)}}",
     map: undefined,
     media: undefined
   });

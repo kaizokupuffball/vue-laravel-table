@@ -22,7 +22,8 @@ export default Vue.extend({
         :laravel-data-resource="{ name: 'users', prefix: 'dashboard' }"
         :show-actions="['create', 'show', 'edit', 'delete']"
         :show-action-icons="true"
-        :hide-columns="['id', 'created_at']"
+        :hide-columns="['created_at']"
+        :searchable-columns="['name']"
         csrf-token="test"
       />
      </div>
