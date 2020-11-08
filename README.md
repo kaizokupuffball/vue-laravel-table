@@ -24,32 +24,65 @@ Register the component in your Vue setup.
 
 Example:
 
-    app.js
-    
-    import VueLaravelTable from './VueLaravelTable';
-    const app = new Vue({
-    	el: '#app',
-        components: {
-        	VueLaravelTable
+```js
+import VueLaravelTable from './VueLaravelTable';
+const app = new Vue({
+	el: '#app',
+    components: {
+    	VueLaravelTable
+    }
+});
+```
+
+
+```html
+<div id="app">
+	<vue-laravel-table
+    	laravel-data-url="http://table-test.test/datatable/users"
+    	:laravel-data-resource="{ name: 'users', prefix: 'dashboard' }"
+    	:show-actions="['create', 'show', 'edit', 'delete']"
+    	:show-action-icons="true"
+    	:searchable-columns="['name', 'email']"
+    	:hide-columns="['id', 'created_at']"
+    	csrf-token="your_csrf_token_here_if_you_have_delete_in_show_actions"
+	/>
+</div>
+```
+
+​     
+
+```php
+<?php
+
+namespace App\Http\Controllers;
+
+use App\Models\User;
+use Illuminate\Http\Request;
+
+class DatatableController extends Controller
+{   
+    /**
+     * Users table
+     *
+     * @return JSON
+     */
+    public static function users(Request $request)
+    {
+        if ($request->query('q')) {
+            $users = User::select(['id', 'name', 'email', 'created_at'])->where(function($q) use($request) { 
+                $qC = explode(',', $request->query('qC'));
+                foreach ($qC as $c) {
+                    $q->where($c, 'LIKE', '%'. $request->query('q') .'%');
+                }
+            })->paginate(5);
+        } else {
+            $users = User::select(['id', 'name', 'email', 'created_at'])->paginate(5);
         }
-    });
+        return response()->json($users);
+    }
+}
+```
 
-
-    Some view file...
-    
-    <div id="app">
-    	<vue-laravel-table
-        	laravel-data-url="http://table-test.test/datatable/users"
-        	:laravel-data-resource="{ name: 'users', prefix: 'dashboard' }"
-        	:show-actions="['create', 'show', 'edit', 'delete']"
-        	:show-action-icons="true"
-        	:searchable-columns="['name', 'email']"
-        	:hide-columns="['id', 'created_at']"
-        	csrf-token="your_csrf_token_here_if_you_have_delete_in_show_actions"
-    	/>
-    </div>
-
-  
 
 
 
@@ -80,6 +113,8 @@ Example:
    - Straight forward. Add font-awesome-free icon classes to the action buttons, instead of the action text. You'll need to have font-awesome styles included yourself. Icons will have these classes: `fas fa-fw fa-icon`.
 -  **Array** `:searchable-columns`
    - Yes, there is a search function. Just put the columns that you want to be searchable in this array, and they will become searchable. ***Magic***
+   - The query parameters are the following.. `q` is the query string (what you search for) and `qC` is the columns in the table that are going to be searched.
+   - See the Laravel controller example above to get a better hang of it.
 
 
 
