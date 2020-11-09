@@ -8,9 +8,7 @@ Very simple to use Vue single-file-component that will take [Laravel](https://la
 
 ## Requirements
 
-[Laravel](https://laravel.com) <br />[Axios](https://github.com/axios/axios)  
-
-  
+[Laravel](https://laravel.com) <br />[Axios](https://github.com/axios/axios)  <br />
 
 
 ## Installing
@@ -38,13 +36,14 @@ const app = new Vue({
 ```html
 <div id="app">
 	<vue-laravel-table
-    	laravel-data-url="http://table-test.test/datatable/users"
-    	:laravel-data-resource="{ name: 'users', prefix: 'dashboard' }"
-    	:show-actions="['create', 'show', 'edit', 'delete']"
-    	:show-action-icons="true"
-    	:searchable-columns="['name', 'email']"
-    	:hide-columns="['id', 'created_at']"
-    	csrf-token="your_csrf_token_here_if_you_have_delete_in_show_actions"
+        laravel-data-url="http://table-test.test/datatable/users"
+        :laravel-data-resource="{ name: 'users', prefix: 'dashboard' }"
+        :show-actions="['create', 'show', 'edit', 'delete']"
+        :show-action-icons="true"
+        :show-per-page="true"
+        :hide-columns="['created_at', 'id']"
+        :searchable-columns="['name']"
+        csrf-token="your_csrf_token"
 	/>
 </div>
 ```
@@ -74,9 +73,9 @@ class DatatableController extends Controller
                 foreach ($qC as $c) {
                     $q->where($c, 'LIKE', '%'. $request->query('q') .'%');
                 }
-            })->paginate(5);
+            })->paginate($request->query('perPage'));
         } else {
-            $users = User::select(['id', 'name', 'email', 'created_at'])->paginate(5);
+            $users = User::select(['id', 'name', 'email', 'created_at'])->paginate($request->query('perPage'));
         }
         return response()->json($users);
     }
@@ -99,15 +98,15 @@ class DatatableController extends Controller
    - The object should contain both a name and a prefix *(last one is optional)*.
    - The `name` should be `users` if that is the resource you are grabbing. And the prefix is just in case you may have a prefix for your resource controller in Laravel. *No slashes needs to be added.*
 -  **Array**  `:hide-columns`
--  Pretty self explanatory. Just add the columns you do not want the table to render. But the columns and the data will still be there, just not rendered to the table.
+   -  Pretty self explanatory. Just add the columns you do not want the table to render. But the columns and the data will still be there, just not rendered to the table.
 -  **String**  `csrf-token`
 
    -  This is the csrf-token that Laravel uses. If you have decided to show the delete action in the `show-actions` prop, you should provide the `csrf-token`.
 -  **Array**  `:show-actions`
-- This is the kind of actions you want to show in the table.
-   - You can only choose from `create`, `show`, `edit` and `delete`.
-   - The three first ones will be shown as links to the correspondent resource. The delete however will be shown as a form with the hidden `_method` as `DELETE`
-   - It's worth mentioning all URL's here are generated with the resource controller standard that can be found in the [Laravel documentation](https://laravel.com/docs/8.x/controllers#resource-controllers).
+   -  This is the kind of actions you want to show in the table.
+   -  You can only choose from `create`, `show`, `edit` and `delete`.
+   -  The three first ones will be shown as links to the correspondent resource. The delete however will be shown as a form with the hidden `_method` as `DELETE`
+   -  It's worth mentioning all URL's here are generated with the resource controller standard that can be found in the [Laravel documentation](https://laravel.com/docs/8.x/controllers#resource-controllers).
 -  **Boolean** `:show-action-icons`
 
    - Straight forward. Add font-awesome-free icon classes to the action buttons, instead of the action text. You'll need to have font-awesome styles included yourself. Icons will have these classes: `fas fa-fw fa-icon`.
@@ -115,6 +114,9 @@ class DatatableController extends Controller
    - Yes, there is a search function. Just put the columns that you want to be searchable in this array, and they will become searchable. ***Magic***
    - The query parameters are the following.. `q` is the query string (what you search for) and `qC` is the columns in the table that are going to be searched.
    - See the Laravel controller example above to get a better hang of it.
+-  Boolean `:show-per-page`
+   - Will display a items per page selector if set to true. By default the component will always grab 25 items per page. 
+   - If you set this to true however, you can use the selector to grab 25, 50, 100, 250, 500 or 1000 items per page.
 
 
 

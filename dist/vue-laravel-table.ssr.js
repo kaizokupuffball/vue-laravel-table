@@ -1,4 +1,4 @@
-'use strict';Object.defineProperty(exports,'__esModule',{value:true});function _defineProperty(obj, key, value) {
+'use strict';Object.defineProperty(exports,'__esModule',{value:true});var _=require('lodash');function _interopDefaultLegacy(e){return e&&typeof e==='object'&&'default'in e?e:{'default':e}}var ___default=/*#__PURE__*/_interopDefaultLegacy(_);function _defineProperty(obj, key, value) {
   if (key in obj) {
     Object.defineProperty(obj, key, {
       value: value,
@@ -67,73 +67,7 @@ function _arrayLikeToArray(arr, len) {
 
 function _nonIterableRest() {
   throw new TypeError("Invalid attempt to destructure non-iterable instance.\nIn order to be iterable, non-array objects must have a [Symbol.iterator]() method.");
-}//
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
-var script = {
+}var script = {
   /**
    * Component name
    */
@@ -173,6 +107,10 @@ var script = {
       type: Array,
       required: false,
       default: []
+    },
+    showPerPage: {
+      type: Boolean,
+      required: false
     }
   },
 
@@ -185,7 +123,12 @@ var script = {
       tableHeaders: [],
       loading: false,
       acceptedActions: ['create', 'edit', 'show', 'delete'],
-      searchQuery: ''
+      searchQuery: '',
+      perPage: 25,
+      orderBy: {
+        direction: false,
+        column: false
+      }
     };
   },
   mounted: function mounted() {
@@ -218,19 +161,26 @@ var script = {
     /**
      * searchQuery are beein watched for changes
      * so everytime the search query changes, the "search" method
-     * is run..
-     * TODO: Add throttling
+     * is run. There is debouncing on this with 300ms
      */
-    searchQuery: function searchQuery(v) {
+    searchQuery: ___default['default'].debounce(function (v) {
       this.search(v);
+    }, 300),
+
+    /**
+     * Just update the perPage number
+     * when the user selected another than the default
+     */
+    perPage: function perPage(v) {
+      this.changePerPage(v);
     }
   },
   methods: {
     /**
-     * Simple search query
+     * Search function
      */
-    search: function search(query) {
-      this.getResults(this.laravelData.links[1].url, query);
+    search: function search(q) {
+      this.getResults(this.laravelDataUrl, q);
     },
 
     /**
@@ -242,18 +192,30 @@ var script = {
       event.preventDefault();
       this.getResults(event.target.getAttribute('data-href'), this.searchQuery);
     },
-    getResults: function getResults(url) {
+
+    /**
+     * When the user changes the items per page, the table refreshes
+     */
+    changePerPage: function changePerPage(itemsPerPage) {
+      this.getResults(this.laravelDataUrl, this.searchQuery);
+    },
+    getResults: function getResults(dataUrl) {
       var _this = this;
 
-      var query = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : false;
-      this.loading = true;
-      var dataUrl = url;
+      var searchQuery = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : false;
+      // Start loading spinner
+      this.loading = true; // Prepare the URL
 
-      if (query !== false && query.length) {
-        dataUrl += '&q=' + encodeURI(query) + '&qC=' + encodeURI(this.searchableColumns);
-      }
+      var url = new URL(dataUrl); // Add search parameters if there exists a search
 
-      axios.get(dataUrl).then(function (response) {
+      if (searchQuery !== false && searchQuery.length) {
+        url.searchParams.set('q', searchQuery);
+        url.searchParams.set('qC', this.searchableColumns);
+      } // Add perPage parameters
+
+
+      url.searchParams.set('perPage', this.perPage);
+      axios.get(url).then(function (response) {
         _this.laravelData = response.data;
         _this.tableHeaders = _this.generateTableHeaders;
         _this.loading = false;
@@ -268,7 +230,8 @@ var script = {
      * come from the laravel data object (database column names)
      */
     formatHeader: function formatHeader(str) {
-      return (str[0].toUpperCase() + str.slice(1)).replace(/_/g, ' ');
+      var formatedStr = (str[0].toUpperCase() + str.slice(1)).replace(/_/g, ' ');
+      return formatedStr;
     },
 
     /**
@@ -460,24 +423,67 @@ var __vue_render__ = function __vue_render__() {
 
   return _c('div', {
     staticClass: "table-wrapper"
-  }, [_vm._ssrNode("<div class=\"table-actions\">" + (_vm.showActions.includes('create') ? "<span>" + _vm._s(this.generateCreateButton()) + "</span>" : "<!---->") + " " + (_vm.searchableColumns.length ? "<div class=\"search\"><input id=\"search\" type=\"text\" name=\"q\" placeholder=\"Search...\"" + _vm._ssrAttr("value", _vm.searchQuery) + " class=\"form-control\"></div>" : "<!---->") + "</div> <table class=\"table table-bordered\"><thead class=\"font-weight-bold\"><tr>" + _vm._ssrList(_vm.tableHeaders, function (header) {
-    return "<td>" + _vm._ssrEscape(_vm._s(header)) + "</td>";
-  }) + "</tr></thead> <tbody>" + (_vm.laravelData.total == 0 ? "<tr><span class=\"no-results\">No results</span></tr>" : "<!---->") + " " + _vm._ssrList(_vm.laravelData.data, function (r, k) {
-    return _vm.laravelData.total != 0 ? "<tr>" + _vm._ssrList(r, function (v, k) {
+  }, [_vm._ssrNode("<div class=\"table-actions\">" + (_vm.showActions.includes('create') ? "<div class=\"create table-action\">" + _vm._s(this.generateCreateButton()) + "</div>" : "<!---->") + " " + (_vm.searchableColumns.length ? "<div class=\"search table-action\"><input id=\"search\" type=\"text\" name=\"q\" placeholder=\"Search...\"" + _vm._ssrAttr("value", _vm.searchQuery) + " class=\"form-control\"></div>" : "<!---->") + "</div> <table class=\"table table-bordered\"><thead class=\"font-weight-bold\"><tr>" + _vm._ssrList(_vm.tableHeaders, function (header) {
+    return "<td>" + _vm._s(header) + "</td>";
+  }) + "</tr></thead> <tbody>" + (_vm.laravelData.total <= 0 ? "<tr><span class=\"no-results\">No results</span></tr>" : "<!---->") + " " + _vm._ssrList(_vm.laravelData.data, function (r, k) {
+    return _vm.laravelData.total > 0 ? "<tr>" + _vm._ssrList(r, function (v, k) {
       return _vm.hideColumns.includes(k) == false ? "<td>" + _vm._ssrEscape(_vm._s(v)) + "</td>" : "<!---->";
     }) + " " + (_vm.showActions.length ? "<td class=\"row-actions\">" + _vm._ssrList(_vm.generateRowActions(r.id), function (v, k) {
       return _vm._ssrList(v, function (v, k) {
         return "<span class=\"action\">" + _vm._s(v) + "</span>";
       });
     }) + "</td>" : "<!---->") + "</tr>" : "<!---->";
-  }) + "</tbody></table> " + (_vm.laravelData.total != 0 ? "<div id=\"pagination\"><ul class=\"pagination\">" + _vm._ssrList(_vm.laravelData.links, function (link) {
+  }) + "</tbody></table> " + (_vm.laravelData.total > 0 ? "<div id=\"pagination\"><ul class=\"pagination\">" + _vm._ssrList(_vm.laravelData.links, function (link) {
     return "<li" + _vm._ssrClass("page-item", {
       disabled: link.url == null,
       active: link.active
     }) + "><a href=\"#\"" + _vm._ssrAttr("data-href", link.url) + " class=\"page-link\">" + _vm._s(link.label) + "</a></li>";
   }) + "</ul></div>" : "<!---->") + " <div" + _vm._ssrClass("loading-spinner", {
     show: _vm.loading
-  }) + "><div class=\"lds-ring\"><div></div> <div></div> <div></div> <div></div></div></div>")]);
+  }) + "><div class=\"lds-ring\"><div></div> <div></div> <div></div> <div></div></div></div> "), _vm.showPerPage === true ? [_vm._ssrNode("<div class=\"per-page\">", "</div>", [_c('select', {
+    directives: [{
+      name: "model",
+      rawName: "v-model",
+      value: _vm.perPage,
+      expression: "perPage"
+    }],
+    staticClass: "custom-select",
+    on: {
+      "change": function change($event) {
+        var $$selectedVal = Array.prototype.filter.call($event.target.options, function (o) {
+          return o.selected;
+        }).map(function (o) {
+          var val = "_value" in o ? o._value : o.value;
+          return val;
+        });
+        _vm.perPage = $event.target.multiple ? $$selectedVal : $$selectedVal[0];
+      }
+    }
+  }, [_c('option', {
+    attrs: {
+      "value": "25"
+    }
+  }, [_vm._v("25")]), _vm._v(" "), _c('option', {
+    attrs: {
+      "value": "50"
+    }
+  }, [_vm._v("50")]), _vm._v(" "), _c('option', {
+    attrs: {
+      "value": "100"
+    }
+  }, [_vm._v("100")]), _vm._v(" "), _c('option', {
+    attrs: {
+      "value": "250"
+    }
+  }, [_vm._v("250")]), _vm._v(" "), _c('option', {
+    attrs: {
+      "value": "500"
+    }
+  }, [_vm._v("500")]), _vm._v(" "), _c('option', {
+    attrs: {
+      "value": "1000"
+    }
+  }, [_vm._v("1000")])])])] : _vm._e()], 2);
 };
 
 var __vue_staticRenderFns__ = [];
@@ -485,8 +491,8 @@ var __vue_staticRenderFns__ = [];
 
 var __vue_inject_styles__ = function __vue_inject_styles__(inject) {
   if (!inject) return;
-  inject("data-v-7b1346a3_0", {
-    source: "#pagination{display:inline-flex}.table-actions{margin:10px 0}.table-actions span{display:inline-block;margin:0 10px}.table-actions span:first-child{margin-left:0}.table-actions span:last-child{margim-right:0}.table-actions .search{width:200px;display:inline-block;position:relative;top:3px}.row-actions .action{margin:0 10px}.row-actions .action:first-child{margin-left:0}.row-actions .action:last-child{margin-right:0}.row-actions .action-form{display:inline-flex}.row-actions .action-form button{padding:0;margin:0}.loading-spinner{display:inline-flex;opacity:0;transition:opacity .1s cubic-bezier(1,1,0,0);position:absolute;margin:12px}.loading-spinner.show{opacity:1}.loading-spinner.show .lds-ring div{animation:lds-ring 1.2s cubic-bezier(.5,0,.5,1) infinite}.loading-spinner .lds-ring{position:relative}.loading-spinner .lds-ring div{box-sizing:border-box;display:block;position:absolute;border:2px solid #007bff;border-radius:50%;border-color:#007bff transparent transparent transparent;width:16px;height:16px}.loading-spinner .lds-ring div:nth-child(1){animation-delay:-.45s}.loading-spinner .lds-ring div:nth-child(2){animation-delay:-.3s}.loading-spinner .lds-ring div:nth-child(3){animation-delay:-.15s}@keyframes lds-ring{0%{transform:rotate(0)}100%{transform:rotate(360deg)}}",
+  inject("data-v-b6861f2a_0", {
+    source: "#pagination{display:inline-flex}.per-page{float:right}.table-actions{margin:10px 0}.table-actions .table-action{margin:0 10px;display:inline-block}.table-actions .table-action:first-child{margin-left:0}.table-actions .table-action:last-child{margin-right:0}.table-actions .search{width:200px;display:inline-block;position:relative;top:3px}.row-actions .action{margin:0 10px}.row-actions .action:first-child{margin-left:0}.row-actions .action:last-child{margin-right:0}.row-actions .action-form{display:inline-flex}.row-actions .action-form button{padding:0;margin:0}.loading-spinner{display:inline-flex;opacity:0;transition:opacity .1s cubic-bezier(1,1,0,0);position:absolute;margin:12px}.loading-spinner.show{opacity:1}.loading-spinner.show .lds-ring div{animation:lds-ring 1.2s cubic-bezier(.5,0,.5,1) infinite}.loading-spinner .lds-ring{position:relative}.loading-spinner .lds-ring div{box-sizing:border-box;display:block;position:absolute;border:2px solid #007bff;border-radius:50%;border-color:#007bff transparent transparent transparent;width:16px;height:16px}.loading-spinner .lds-ring div:nth-child(1){animation-delay:-.45s}.loading-spinner .lds-ring div:nth-child(2){animation-delay:-.3s}.loading-spinner .lds-ring div:nth-child(3){animation-delay:-.15s}@keyframes lds-ring{0%{transform:rotate(0)}100%{transform:rotate(360deg)}}",
     map: undefined,
     media: undefined
   });
@@ -497,7 +503,7 @@ var __vue_inject_styles__ = function __vue_inject_styles__(inject) {
 var __vue_scope_id__ = undefined;
 /* module identifier */
 
-var __vue_module_identifier__ = "data-v-7b1346a3";
+var __vue_module_identifier__ = "data-v-b6861f2a";
 /* functional template */
 
 var __vue_is_functional_template__ = false;

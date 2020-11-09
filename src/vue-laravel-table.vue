@@ -3,43 +3,53 @@
   <div class="table-wrapper">
 
     <div class="table-actions">
+
       <template v-if="showActions.includes('create')">
-        <span v-html="this.generateCreateButton()"></span>
+        <div class="create table-action" v-html="this.generateCreateButton()">
+        </div>
       </template>
+
       <template v-if="searchableColumns.length">
-        <div class="search">
+        <div class="search table-action">
           <input v-model="searchQuery" id="search" class="form-control" type="text" name="q" placeholder="Search..." />
         </div> 
       </template>
+
     </div>
       
     <table class="table table-bordered">
 
       <thead class="font-weight-bold">
         <tr>
-          <td v-for="header in tableHeaders">{{ header }}</td>
+          <td v-for="header in tableHeaders" v-html="header"></td>
         </tr>
       </thead>
 
       <tbody>
-        <tr v-if="laravelData.total == 0">
+
+        <tr v-if="laravelData.total <= 0">
           <span class="no-results">No results</span>
         </tr>
-        <tr v-if="laravelData.total != 0" v-for="(r, k) in laravelData.data">
+
+        <tr v-if="laravelData.total > 0" v-for="(r, k) in laravelData.data">
+
           <td v-for="(v, k) in r" v-if="hideColumns.includes(k) == false">
             <template>{{ v }}</template>
           </td>
+
           <td v-if="showActions.length" class="row-actions">
             <template v-for="(v, k) in generateRowActions(r.id)">
               <span class="action" v-for="(v, k) in v" v-html="v"></span>
             </template>
           </td>
+
         </tr>
+
       </tbody>
 
     </table>
 
-    <div v-if="laravelData.total != 0" id="pagination">
+    <div v-if="laravelData.total > 0" id="pagination">
       <ul class="pagination">
         <template v-for="link in laravelData.links">
           <li class="page-item" :class="{ disabled: link.url == null, active: link.active }">
@@ -57,6 +67,19 @@
           <div></div>
       </div>
     </div>
+        
+    <template v-if="showPerPage === true">
+      <div class="per-page">
+        <select v-model="perPage" class="custom-select">
+            <option value="25">25</option>
+            <option value="50">50</option>
+            <option value="100">100</option>
+            <option value="250">250</option>
+            <option value="500">500</option>
+            <option value="1000">1000</option>
+        </select>
+      </div>
+    </template>
 
   </div>
 
@@ -65,6 +88,7 @@
 
 
 <script>
+import _ from 'lodash';
 export default {
   
   /**
@@ -106,6 +130,10 @@ export default {
       type: Array,
       required: false,
       default: []
+    },
+    showPerPage: {
+      type: Boolean,
+      required: false
     }
   },
 
@@ -118,7 +146,12 @@ export default {
       tableHeaders: [],
       loading: false,
       acceptedActions: ['create', 'edit', 'show', 'delete'],
-      searchQuery: ''
+      searchQuery: '',
+      perPage: 25,
+      orderBy: {
+        direction: false,
+        column: false
+      }
     }
   },
 
@@ -151,11 +184,18 @@ export default {
     /**
      * searchQuery are beein watched for changes
      * so everytime the search query changes, the "search" method
-     * is run..
-     * TODO: Add throttling
+     * is run. There is debouncing on this with 300ms
      */
-    searchQuery: function(v) {
+    searchQuery: _.debounce(function(v) {
       this.search(v);
+    }, 300),
+
+    /**
+     * Just update the perPage number
+     * when the user selected another than the default
+     */
+    perPage: function(v) {
+      this.changePerPage(v);
     }
 
   },
@@ -163,10 +203,10 @@ export default {
   methods: {
 
     /**
-     * Simple search query
+     * Search function
      */
-    search(query) {
-      this.getResults(this.laravelData.links[1].url, query);
+    search(q) {
+      this.getResults(this.laravelDataUrl, q);
     },
 
     /**
@@ -179,16 +219,31 @@ export default {
       this.getResults(event.target.getAttribute('data-href'), this.searchQuery);
     },
 
+    /**
+     * When the user changes the items per page, the table refreshes
+     */
+    changePerPage(itemsPerPage) {
+      this.getResults(this.laravelDataUrl, this.searchQuery);
+    },
 
-    getResults(url, query = false) {
+    getResults(dataUrl, searchQuery = false) {
+
+      // Start loading spinner
       this.loading = true;
 
-      var dataUrl = url;
-      if (query !== false && query.length) {
-        dataUrl+= '&q=' + encodeURI(query) + '&qC='+ encodeURI(this.searchableColumns);
+      // Prepare the URL
+      let url = new URL(dataUrl);
+
+      // Add search parameters if there exists a search
+      if (searchQuery !== false && searchQuery.length) {
+        url.searchParams.set('q', searchQuery);
+        url.searchParams.set('qC', this.searchableColumns);
       }
 
-      axios.get(dataUrl)
+      // Add perPage parameters
+      url.searchParams.set('perPage', this.perPage);
+
+      axios.get(url)
       .then(response => {
         this.laravelData = response.data;
         this.tableHeaders = this.generateTableHeaders;
@@ -197,6 +252,7 @@ export default {
       .catch((error) => {
         throw new Error(error);
       });
+
     },
 
     /**
@@ -205,7 +261,8 @@ export default {
      * come from the laravel data object (database column names)
      */
     formatHeader(str) {
-      return (str[0].toUpperCase() + str.slice(1)).replace(/_/g, ' ');
+      var formatedStr = (str[0].toUpperCase() + str.slice(1)).replace(/_/g, ' ');
+      return formatedStr;
     },
 
     /**
@@ -289,19 +346,23 @@ export default {
       display:inline-flex;
     }
 
+    .per-page {
+      float:right;
+    }
+
     .table-actions {
       margin:10px 0;
 
-      span {
-        display:inline-block;
+      .table-action {
         margin:0 10px;
+        display:inline-block;
 
         &:first-child {
           margin-left:0;
         }
 
         &:last-child {
-          margim-right:0;
+          margin-right:0;
         }
       }
 
