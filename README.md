@@ -25,7 +25,7 @@ Example:
 ```js
 import VueLaravelTable from './VueLaravelTable';
 const app = new Vue({
-	el: '#app',
+    el: '#app',
     components: {
     	VueLaravelTable
     }
@@ -36,7 +36,7 @@ const app = new Vue({
 ```html
 <div id="app">
 	<vue-laravel-table
-		laravel-data-url="http://table-test.test/datatable/users"
+	 laravel-data-url="http://table-test.test/datatable/users"
          :laravel-data-resource="{ name: 'users', prefix: 'dashboard' }"
          :show-actions="['create', 'show', 'edit', 'delete']"
          :show-action-icons="true"
