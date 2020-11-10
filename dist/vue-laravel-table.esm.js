@@ -45,12 +45,12 @@ var script = {
     showPerPage: {
       type: Boolean,
       required: false
+    },
+    orderableColumns: {
+      type: Array,
+      required: false
     }
   },
-
-  /**
-   * Our data
-   */
   data: function () {
     return {
       laravelData: {},
@@ -58,6 +58,7 @@ var script = {
       loading: false,
       acceptedActions: ['create', 'edit', 'show', 'delete'],
       searchQuery: '',
+      currentPage: 1,
       perPage: 25,
       orderBy: {
         direction: false,
@@ -67,7 +68,7 @@ var script = {
   },
 
   mounted() {
-    this.getResults(this.laravelDataUrl);
+    this.getResults();
   },
 
   computed: {
@@ -81,17 +82,26 @@ var script = {
 
       if (this.laravelData.total > 0) {
         for (const [k, v] of Object.entries(this.laravelData.data[0])) {
-          !this.hideColumns.includes(k) && headers.push(this.formatHeader(k));
+          if (!this.hideColumns.includes(k)) {
+            var obj = {};
+            obj[k] = this.formatHeader(k);
+            headers.push(obj);
+          }
         }
 
-        this.showActions.length && headers.push(this.formatHeader('actions'));
+        if (this.showActions.length) {
+          var obj = {};
+          obj['actions'] = this.formatHeader('actions');
+        }
+
+        headers.push(obj);
         return headers;
       }
     }
   },
   watch: {
     /**
-     * searchQuery are beein watched for changes
+     * searchQuery are being watched for changes,
      * so everytime the search query changes, the "search" method
      * is run. There is debouncing on this with 300ms
      */
@@ -109,10 +119,32 @@ var script = {
   },
   methods: {
     /**
+     * Order toggling based on column key and 
+     * order direction (asc, desc)
+     */
+    toggleOrder(event, key) {
+      event.preventDefault();
+
+      if (this.orderBy.direction == false || this.orderBy.column != key) {
+        this.orderBy.direction = 'asc';
+        this.orderBy.column = key;
+      } else if (this.orderBy.direction == 'asc') {
+        this.orderBy.direction = 'desc';
+        this.orderBy.column = key;
+      } else if (this.orderBy.direction == 'desc') {
+        this.orderBy.direction = false;
+        this.orderBy.column = false;
+      }
+
+      this.getResults(this.searchQuery);
+    },
+
+    /**
      * Search function
      */
     search(q) {
-      this.getResults(this.laravelDataUrl, q);
+      this.currentPage = 1;
+      this.getResults(q);
     },
 
     /**
@@ -122,25 +154,35 @@ var script = {
      */
     paginate(event) {
       event.preventDefault();
-      this.getResults(event.target.getAttribute('data-href'), this.searchQuery);
+      var url = new URL(event.target.getAttribute('data-href'));
+      this.currentPage = url.searchParams.get('page');
+      this.getResults(this.searchQuery);
     },
 
     /**
      * When the user changes the items per page, the table refreshes
      */
     changePerPage(itemsPerPage) {
-      this.getResults(this.laravelDataUrl, this.searchQuery);
+      this.currentPage = 1;
+      this.getResults(this.searchQuery);
     },
 
-    getResults(dataUrl, searchQuery = false) {
+    getResults(searchQuery = false) {
       // Start loading spinner
       this.loading = true; // Prepare the URL
 
-      let url = new URL(dataUrl); // Add search parameters if there exists a search
+      let url = new URL(this.laravelDataUrl);
+      url.searchParams.set('page', this.currentPage); // Add search parameters if there exists a search
 
       if (searchQuery !== false && searchQuery.length) {
         url.searchParams.set('q', searchQuery);
         url.searchParams.set('qC', this.searchableColumns);
+      } // Add order parameters if they exist
+
+
+      if (this.orderBy.column != false || this.orderBy.direction != false) {
+        url.searchParams.set('orderBy', this.orderBy.column);
+        url.searchParams.set('orderDirection', this.orderBy.direction);
       } // Add perPage parameters
 
 
@@ -160,8 +202,7 @@ var script = {
      * come from the laravel data object (database column names)
      */
     formatHeader(str) {
-      var formatedStr = (str[0].toUpperCase() + str.slice(1)).replace(/_/g, ' ');
-      return formatedStr;
+      return (str[0].toUpperCase() + str.slice(1)).replace(/_/g, ' ');
     },
 
     /**
@@ -216,7 +257,7 @@ var script = {
           break;
 
         case 'delete':
-          var iconOrText = this.showActionIcons ? '<i class="fas fa-fw fa-times"></i>' : 'Delete';
+          var iconOrText = this.showActionIcons ? '<i class="fas fa-fw fa-trash"></i>' : 'Delete';
           html = '<form class="action-form" method="post" action="' + url + id + '">' + '<input type="hidden" name="_token" value="' + csrf + '">' + '<input type="hidden" name="_method" value="DELETE">' + '<button class="btn btn-link text-danger" type="submit">' + iconOrText + '</button>' + '</form>';
           break;
       }
@@ -376,7 +417,7 @@ var __vue_render__ = function () {
       "innerHTML": _vm._s(this.generateCreateButton())
     }
   })] : _vm._e(), _vm._v(" "), _vm.searchableColumns.length ? [_c('div', {
-    staticClass: "search table-action"
+    staticClass: "search table-action float-right"
   }, [_c('input', {
     directives: [{
       name: "model",
@@ -388,7 +429,6 @@ var __vue_render__ = function () {
     attrs: {
       "id": "search",
       "type": "text",
-      "name": "q",
       "placeholder": "Search..."
     },
     domProps: {
@@ -403,16 +443,26 @@ var __vue_render__ = function () {
         _vm.searchQuery = $event.target.value;
       }
     }
-  })])] : _vm._e()], 2), _vm._v(" "), _c('table', {
+  })])] : _vm._e()], 2), _vm._v(" "), _c('div', {
+    staticClass: "table-responsive"
+  }, [_c('table', {
     staticClass: "table table-bordered"
   }, [_c('thead', {
     staticClass: "font-weight-bold"
-  }, [_c('tr', _vm._l(_vm.tableHeaders, function (header) {
-    return _c('td', {
-      domProps: {
-        "innerHTML": _vm._s(header)
-      }
-    });
+  }, [_c('tr', _vm._l(_vm.tableHeaders, function (headers) {
+    return _c('td', _vm._l(headers, function (v, k) {
+      return _c('span', [_vm.orderableColumns.includes(k) ? _c('a', {
+        staticClass: "orderable",
+        attrs: {
+          "href": "#"
+        },
+        on: {
+          "click": function ($event) {
+            return _vm.toggleOrder($event, k);
+          }
+        }
+      }, [_vm._v(_vm._s(v))]) : _c('span', [_vm._v(_vm._s(v))])]);
+    }), 0);
   }), 0)]), _vm._v(" "), _c('tbody', [_vm.laravelData.total <= 0 ? _c('tr', [_c('span', {
     staticClass: "no-results"
   }, [_vm._v("No results")])]) : _vm._e(), _vm._v(" "), _vm._l(_vm.laravelData.data, function (r, k) {
@@ -430,7 +480,7 @@ var __vue_render__ = function () {
         });
       });
     })], 2) : _vm._e()], 2) : _vm._e();
-  })], 2)]), _vm._v(" "), _vm.laravelData.total > 0 ? _c('div', {
+  })], 2)])]), _vm._v(" "), _vm.laravelData.total > 0 ? _c('div', {
     attrs: {
       "id": "pagination"
     }
@@ -486,6 +536,10 @@ var __vue_render__ = function () {
     }
   }, [_c('option', {
     attrs: {
+      "value": "5"
+    }
+  }, [_vm._v("5")]), _vm._v(" "), _c('option', {
+    attrs: {
       "value": "25"
     }
   }, [_vm._v("25")]), _vm._v(" "), _c('option', {
@@ -526,8 +580,8 @@ var __vue_staticRenderFns__ = [function () {
 
 const __vue_inject_styles__ = function (inject) {
   if (!inject) return;
-  inject("data-v-b6861f2a_0", {
-    source: "#pagination{display:inline-flex}.per-page{float:right}.table-actions{margin:10px 0}.table-actions .table-action{margin:0 10px;display:inline-block}.table-actions .table-action:first-child{margin-left:0}.table-actions .table-action:last-child{margin-right:0}.table-actions .search{width:200px;display:inline-block;position:relative;top:3px}.row-actions .action{margin:0 10px}.row-actions .action:first-child{margin-left:0}.row-actions .action:last-child{margin-right:0}.row-actions .action-form{display:inline-flex}.row-actions .action-form button{padding:0;margin:0}.loading-spinner{display:inline-flex;opacity:0;transition:opacity .1s cubic-bezier(1,1,0,0);position:absolute;margin:12px}.loading-spinner.show{opacity:1}.loading-spinner.show .lds-ring div{animation:lds-ring 1.2s cubic-bezier(.5,0,.5,1) infinite}.loading-spinner .lds-ring{position:relative}.loading-spinner .lds-ring div{box-sizing:border-box;display:block;position:absolute;border:2px solid #007bff;border-radius:50%;border-color:#007bff transparent transparent transparent;width:16px;height:16px}.loading-spinner .lds-ring div:nth-child(1){animation-delay:-.45s}.loading-spinner .lds-ring div:nth-child(2){animation-delay:-.3s}.loading-spinner .lds-ring div:nth-child(3){animation-delay:-.15s}@keyframes lds-ring{0%{transform:rotate(0)}100%{transform:rotate(360deg)}}",
+  inject("data-v-16adfc9e_0", {
+    source: "#pagination{display:inline-flex}.per-page{float:right}.table-actions{margin:10px 0}.table-actions .table-action{margin:0 10px;display:inline-block}.table-actions .table-action:first-child{margin-left:0}.table-actions .table-action:last-child{margin-right:0}.table-actions .search{width:200px;display:inline-block;position:relative}.row-actions .action{margin:0 10px}.row-actions .action:first-child{margin-left:0}.row-actions .action:last-child{margin-right:0}.row-actions .action-form{display:inline}.row-actions .action-form button{margin:-1px;padding:0;position:absolute}.loading-spinner{display:inline-flex;opacity:0;transition:opacity .1s cubic-bezier(1,1,0,0);position:absolute;margin:12px}.loading-spinner.show{opacity:1}.loading-spinner.show .lds-ring div{animation:lds-ring 1.2s cubic-bezier(.5,0,.5,1) infinite}.loading-spinner .lds-ring{position:relative}.loading-spinner .lds-ring div{box-sizing:border-box;display:block;position:absolute;border:2px solid #007bff;border-radius:50%;border-color:#007bff transparent transparent transparent;width:16px;height:16px}.loading-spinner .lds-ring div:nth-child(1){animation-delay:-.45s}.loading-spinner .lds-ring div:nth-child(2){animation-delay:-.3s}.loading-spinner .lds-ring div:nth-child(3){animation-delay:-.15s}@keyframes lds-ring{0%{transform:rotate(0)}100%{transform:rotate(360deg)}}",
     map: undefined,
     media: undefined
   });

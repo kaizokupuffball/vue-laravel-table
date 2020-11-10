@@ -10,44 +10,51 @@
       </template>
 
       <template v-if="searchableColumns.length">
-        <div class="search table-action">
-          <input v-model="searchQuery" id="search" class="form-control" type="text" name="q" placeholder="Search..." />
+        <div class="search table-action float-right">
+          <input v-model="searchQuery" id="search" class="form-control" type="text" placeholder="Search..." />
         </div> 
       </template>
 
     </div>
       
-    <table class="table table-bordered">
+    <div class="table-responsive">
+      <table class="table table-bordered">
 
-      <thead class="font-weight-bold">
-        <tr>
-          <td v-for="header in tableHeaders" v-html="header"></td>
-        </tr>
-      </thead>
+        <thead class="font-weight-bold">
+          <tr>
+            <td v-for="headers in tableHeaders">
+              <span v-for="(v, k) in headers">
+                <a v-if="orderableColumns.includes(k)" class="orderable" href="#" v-on:click="toggleOrder($event, k)">{{ v }}</a>
+                <span v-else>{{ v }}</span>
+              </span>
+            </td>
+          </tr>
+        </thead>
 
-      <tbody>
+        <tbody>
 
-        <tr v-if="laravelData.total <= 0">
-          <span class="no-results">No results</span>
-        </tr>
+          <tr v-if="laravelData.total <= 0">
+            <span class="no-results">No results</span>
+          </tr>
 
-        <tr v-if="laravelData.total > 0" v-for="(r, k) in laravelData.data">
+          <tr v-if="laravelData.total > 0" v-for="(r, k) in laravelData.data">
 
-          <td v-for="(v, k) in r" v-if="hideColumns.includes(k) == false">
-            <template>{{ v }}</template>
-          </td>
+            <td v-for="(v, k) in r" v-if="hideColumns.includes(k) == false">
+              <template>{{ v }}</template>
+            </td>
 
-          <td v-if="showActions.length" class="row-actions">
-            <template v-for="(v, k) in generateRowActions(r.id)">
-              <span class="action" v-for="(v, k) in v" v-html="v"></span>
-            </template>
-          </td>
+            <td v-if="showActions.length" class="row-actions">
+              <template v-for="(v, k) in generateRowActions(r.id)">
+                <span class="action" v-for="(v, k) in v" v-html="v"></span>
+              </template>
+            </td>
 
-        </tr>
+          </tr>
 
-      </tbody>
+        </tbody>
 
-    </table>
+      </table>
+    </div>
 
     <div v-if="laravelData.total > 0" id="pagination">
       <ul class="pagination">
@@ -71,6 +78,7 @@
     <template v-if="showPerPage === true">
       <div class="per-page">
         <select v-model="perPage" class="custom-select">
+            <option value="5">5</option>
             <option value="25">25</option>
             <option value="50">50</option>
             <option value="100">100</option>
@@ -134,12 +142,13 @@ export default {
     showPerPage: {
       type: Boolean,
       required: false
+    },
+    orderableColumns: {
+      type: Array,
+      required: false
     }
   },
 
-  /**
-   * Our data
-   */
   data: function() {
     return {
       laravelData: {},
@@ -147,6 +156,7 @@ export default {
       loading: false,
       acceptedActions: ['create', 'edit', 'show', 'delete'],
       searchQuery: '',
+      currentPage: 1,
       perPage: 25,
       orderBy: {
         direction: false,
@@ -156,7 +166,7 @@ export default {
   },
 
   mounted() {
-    this.getResults(this.laravelDataUrl);
+    this.getResults();
   },
 
   computed: {
@@ -170,9 +180,16 @@ export default {
       var headers = [];
       if (this.laravelData.total > 0) {
         for(const [k, v] of Object.entries(this.laravelData.data[0])) {
-          !this.hideColumns.includes(k) && headers.push(this.formatHeader(k));
+          if(!this.hideColumns.includes(k)) {
+            var obj = {};
+            obj[k] = this.formatHeader(k);
+            headers.push(obj);
+          }
         }
-        this.showActions.length && headers.push(this.formatHeader('actions'));
+        if (this.showActions.length) {
+          var obj = {};
+          obj['actions'] = this.formatHeader('actions');
+        } headers.push(obj);
         return headers;
       }
     }
@@ -182,7 +199,7 @@ export default {
   watch: {
 
     /**
-     * searchQuery are beein watched for changes
+     * searchQuery are being watched for changes,
      * so everytime the search query changes, the "search" method
      * is run. There is debouncing on this with 300ms
      */
@@ -203,10 +220,36 @@ export default {
   methods: {
 
     /**
+     * Order toggling based on column key and 
+     * order direction (asc, desc)
+     */
+    toggleOrder(event, key) {
+      event.preventDefault();
+
+      if (this.orderBy.direction == false || this.orderBy.column != key) {
+        this.orderBy.direction = 'asc';
+        this.orderBy.column = key;
+      }
+
+      else if (this.orderBy.direction == 'asc') {
+        this.orderBy.direction = 'desc';
+        this.orderBy.column = key;
+      }
+
+      else if (this.orderBy.direction == 'desc') {
+        this.orderBy.direction = false;
+        this.orderBy.column = false;
+      }
+
+      this.getResults(this.searchQuery);
+    },
+
+    /**
      * Search function
      */
     search(q) {
-      this.getResults(this.laravelDataUrl, q);
+      this.currentPage = 1;
+      this.getResults(q);
     },
 
     /**
@@ -216,28 +259,38 @@ export default {
      */
     paginate(event) {
       event.preventDefault();
-      this.getResults(event.target.getAttribute('data-href'), this.searchQuery);
+      var url = new URL(event.target.getAttribute('data-href'));
+      this.currentPage = url.searchParams.get('page');
+      this.getResults(this.searchQuery);
     },
 
     /**
      * When the user changes the items per page, the table refreshes
      */
     changePerPage(itemsPerPage) {
-      this.getResults(this.laravelDataUrl, this.searchQuery);
+      this.currentPage = 1;
+      this.getResults(this.searchQuery);
     },
 
-    getResults(dataUrl, searchQuery = false) {
+    getResults(searchQuery = false) {
 
       // Start loading spinner
       this.loading = true;
 
       // Prepare the URL
-      let url = new URL(dataUrl);
+      let url = new URL(this.laravelDataUrl);
+      url.searchParams.set('page', this.currentPage);
 
       // Add search parameters if there exists a search
       if (searchQuery !== false && searchQuery.length) {
         url.searchParams.set('q', searchQuery);
         url.searchParams.set('qC', this.searchableColumns);
+      }
+
+      // Add order parameters if they exist
+      if (this.orderBy.column != false || this.orderBy.direction != false) {
+        url.searchParams.set('orderBy', this.orderBy.column);
+        url.searchParams.set('orderDirection', this.orderBy.direction);
       }
 
       // Add perPage parameters
@@ -261,8 +314,7 @@ export default {
      * come from the laravel data object (database column names)
      */
     formatHeader(str) {
-      var formatedStr = (str[0].toUpperCase() + str.slice(1)).replace(/_/g, ' ');
-      return formatedStr;
+      return (str[0].toUpperCase() + str.slice(1)).replace(/_/g, ' ');
     },
 
     /**
@@ -321,7 +373,7 @@ export default {
           break;
 
         case 'delete':
-          var iconOrText = (this.showActionIcons) ? '<i class="fas fa-fw fa-times"></i>' : 'Delete';
+          var iconOrText = (this.showActionIcons) ? '<i class="fas fa-fw fa-trash"></i>' : 'Delete';
           html = '<form class="action-form" method="post" action="'+ url + id +'">'+
                   '<input type="hidden" name="_token" value="'+ csrf +'">'+
                   '<input type="hidden" name="_method" value="DELETE">'+
@@ -370,7 +422,6 @@ export default {
         width:200px;
         display:inline-block;
         position:relative;
-        top:3px;
       }
     }
 
@@ -388,11 +439,13 @@ export default {
       }
 
       .action-form {
-        display:inline-flex;
+        display:inline;
 
         button {
+          margin:-1px;
           padding:0;
-          margin:0;
+          position:absolute;
+
         }
       }
     }

@@ -36,15 +36,16 @@ const app = new Vue({
 ```html
 <div id="app">
 	<vue-laravel-table
-        laravel-data-url="http://table-test.test/datatable/users"
-        :laravel-data-resource="{ name: 'users', prefix: 'dashboard' }"
-        :show-actions="['create', 'show', 'edit', 'delete']"
-        :show-action-icons="true"
-        :show-per-page="true"
-        :hide-columns="['created_at', 'id']"
-        :searchable-columns="['name']"
-        csrf-token="your_csrf_token"
-	/>
+		laravel-data-url="http://table-test.test/datatable/users"
+         :laravel-data-resource="{ name: 'users', prefix: 'dashboard' }"
+         :show-actions="['create', 'show', 'edit', 'delete']"
+         :show-action-icons="true"
+         :show-per-page="true"
+         :hide-columns="['created_at', 'id']"
+         :searchable-columns="['name']"
+         :orderable-columns="['name', 'email']"
+         csrf-token="your_csrf_token"
+     />
 </div>
 ```
 
@@ -67,16 +68,25 @@ class DatatableController extends Controller
      */
     public static function users(Request $request)
     {
+        // What we want
+        $users = User::select(['id', 'name', 'email', 'created_at']);
+
+        // If there is a search query, we search
         if ($request->query('q')) {
-            $users = User::select(['id', 'name', 'email', 'created_at'])->where(function($q) use($request) { 
+            $users = $users->where(function($q) use($request) { 
                 $qC = explode(',', $request->query('qC'));
                 foreach ($qC as $c) {
                     $q->where($c, 'LIKE', '%'. $request->query('q') .'%');
                 }
-            })->paginate($request->query('perPage'));
-        } else {
-            $users = User::select(['id', 'name', 'email', 'created_at'])->paginate($request->query('perPage'));
+            });
         }
+
+        // If there is orderBy
+        if ($request->query('orderBy') && $request->query('orderDirection')) {
+            $users = $users->orderBy($request->query('orderBy'), $request->query('orderDirection'));
+        }
+
+        $users = $users->paginate($request->query('perPage'));
         return response()->json($users);
     }
 }
@@ -114,9 +124,11 @@ class DatatableController extends Controller
    - Yes, there is a search function. Just put the columns that you want to be searchable in this array, and they will become searchable. ***Magic***
    - The query parameters are the following.. `q` is the query string (what you search for) and `qC` is the columns in the table that are going to be searched.
    - See the Laravel controller example above to get a better hang of it.
--  Boolean `:show-per-page`
+-  **Boolean** `:show-per-page`
    - Will display a items per page selector if set to true. By default the component will always grab 25 items per page. 
    - If you set this to true however, you can use the selector to grab 25, 50, 100, 250, 500 or 1000 items per page.
+-  **Array** `:orderable-columns`
+   - Here you can pass the column names that you want to be orderable. This basically means that you can click the table headers that responds to the given column name, and it will sort the table by ascending or descending order on that key.
 
 
 

@@ -17,16 +17,21 @@ export default Vue.extend({
 <template>
   <div id="app">
     <div class="container">
-      <vue-laravel-table
-        laravel-data-url="http://table-test.test/datatable/users"
-        :laravel-data-resource="{ name: 'users', prefix: 'dashboard' }"
-        :show-actions="['create', 'show', 'edit', 'delete']"
-        :show-action-icons="true"
-        :show-per-page="true"
-        :hide-columns="['created_at', 'id']"
-        :searchable-columns="['name']"
-        csrf-token="test"
-      />
-     </div>
+      <div class="row">
+        <div class="col">
+          <vue-laravel-table
+            laravel-data-url="http://table-test.test/datatable/users"
+            :laravel-data-resource="{ name: 'users', prefix: 'dashboard' }"
+            :show-actions="['create', 'show', 'edit', 'delete']"
+            :show-action-icons="true"
+            :show-per-page="true"
+            :hide-columns="['created_at', 'id']"
+            :searchable-columns="['name']"
+            :orderable-columns="['name', 'email']"
+            csrf-token="test"
+          />
+        </div>
+      </div>
+    </div>
   </div>
 </template>
